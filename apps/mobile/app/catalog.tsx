@@ -1,0 +1,5 @@
+import {useEffect,useState} from "react";
+import {FlatList,StyleSheet,Text,View} from "react-native";
+const API=process.env.EXPO_PUBLIC_API_URL??"http://localhost:3000";
+export default function Catalog(){const[items,setItems]=useState<any[]>([]);useEffect(()=>{fetch(API+"/api/listings").then(r=>r.json()).then(x=>setItems(x.listings??[])).catch(()=>{});},[]);return <View style={s.c}><Text style={s.h}>Каталог</Text><FlatList data={items} keyExtractor={x=>x.id} renderItem={({item})=><View style={s.card}><Text style={s.n}>{item.title}</Text><Text style={s.p}>{item.price} {item.currency}</Text><Text style={s.m}>{item.city??"Онлайн"} · {item.category??"Без категории"}</Text></View>}/></View>}
+const s=StyleSheet.create({c:{flex:1,backgroundColor:"#08090d",padding:20},h:{color:"#fff",fontSize:28,fontWeight:"800",marginBottom:16},card:{backgroundColor:"#11141c",padding:18,borderRadius:16,marginBottom:10},n:{color:"#fff",fontSize:17,fontWeight:"700"},p:{color:"#20e3b2",fontSize:18,fontWeight:"800",marginTop:6},m:{color:"#8f96a6",marginTop:5}});
