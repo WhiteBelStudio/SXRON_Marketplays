@@ -137,6 +137,10 @@ export async function GET(request: Request) {
     );
     const total = Number(countResult.rows[0]?.total ?? 0);
     return NextResponse.json({ listings: result.rows, total, limit, offset, hasMore: offset + result.rows.length < total });
+  } catch {
+    return NextResponse.json({ error: "Не удалось загрузить объявления." }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
