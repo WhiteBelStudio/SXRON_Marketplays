@@ -14,7 +14,7 @@ async function uniqueSlug(title:string) {
   return base+"-"+Date.now().toString(36);
 }
 async function validateCategory(categoryId:string) {
-  const r=await db.query(\`SELECT c.id,EXISTS(SELECT 1 FROM categories child WHERE child.parent_id=c.id AND child.is_active=true) AS has_children FROM categories c WHERE c.id=$1 AND c.is_active=true LIMIT 1\`,[categoryId]);
+  const r=await db.query(`SELECT c.id,EXISTS(SELECT 1 FROM categories child WHERE child.parent_id=c.id AND child.is_active=true) AS has_children FROM categories c WHERE c.id=$1 AND c.is_active=true LIMIT 1`,[categoryId]);
   const c=r.rows[0]; if(!c)return {ok:false,error:"Категория не найдена или отключена."}; if(c.has_children)return {ok:false,error:"Выберите подкатегорию, а не основную категорию."}; return {ok:true};
 }
 function parseInput(body:ListingInput) {
@@ -50,12 +50,12 @@ export async function GET(request:Request) {
     const maxPrice=url.searchParams.get("maxPrice"); if(maxPrice&&Number.isFinite(Number(maxPrice))){values.push(Number(maxPrice));conditions.push("l.price <= $"+values.length);}
     const limit=Math.min(Math.max(Number(url.searchParams.get("limit")??24),1),50);values.push(limit);
     const result=await db.query(
-      \`SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
+      `SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
               c.name AS category,c.slug AS category_slug,s.store_name AS seller,
               COALESCE((SELECT json_agg(json_build_object('id',li.id,'url',li.url,'sort_order',li.sort_order) ORDER BY li.sort_order,li.id) FROM listing_images li WHERE li.listing_id=l.id),'[]'::json) AS images
        FROM listings l LEFT JOIN categories c ON c.id=l.category_id LEFT JOIN sellers s ON s.id=l.seller_id
        WHERE \${conditions.join(" AND ")}
-       ORDER BY l.is_featured DESC,l.created_at DESC LIMIT $\${values.length}\`,
+       ORDER BY l.is_featured DESC,l.created_at DESC LIMIT $\${values.length}`,
       values,
     );
     return NextResponse.json({listings:result.rows});
@@ -70,7 +70,7 @@ export async function POST(request:Request) {
     if("error" in parsed)return NextResponse.json({error:parsed.error},{status:400});
     const category=await validateCategory(parsed.categoryId);if(!category.ok)return NextResponse.json({error:category.error},{status:400});
     const sellerResult=await db.query("SELECT id FROM sellers WHERE user_id=$1 LIMIT 1",[user.id]),sellerId=sellerResult.rows[0]?.id??null,slug=await uniqueSlug(parsed.title);
-    const result=await db.query(\`INSERT INTO listings (seller_id,category_id,owner_id,type,title,slug,description,price,currency,quantity,city,condition,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id,title,slug,description,price,currency,quantity,city,condition,type,status,category_id,owner_id,seller_id,created_at,updated_at\`,[sellerId,parsed.categoryId,user.id,parsed.type,parsed.title,slug,parsed.description,parsed.price,parsed.currency,parsed.quantity,parsed.city,parsed.condition,parsed.status]);
+    const result=await db.query(`INSERT INTO listings (seller_id,category_id,owner_id,type,title,slug,description,price,currency,quantity,city,condition,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id,title,slug,description,price,currency,quantity,city,condition,type,status,category_id,owner_id,seller_id,created_at,updated_at`,[sellerId,parsed.categoryId,user.id,parsed.type,parsed.title,slug,parsed.description,parsed.price,parsed.currency,parsed.quantity,parsed.city,parsed.condition,parsed.status]);
     const listing=result.rows[0];
     if(parsed.images.length)await db.query("INSERT INTO listing_images (listing_id,url,sort_order) SELECT $1,url,ord-1 FROM unnest($2::text[]) WITH ORDINALITY AS t(url,ord)",[listing.id,parsed.images]);
     return NextResponse.json({listing},{status:201});
