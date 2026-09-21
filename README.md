@@ -30,3 +30,6 @@ Open http://localhost:3000.
 8. API + PostgreSQL
 9. Mobile clients
 10. Desktop clients
+
+
+<!-- build verification -->
