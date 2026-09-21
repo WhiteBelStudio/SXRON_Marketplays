@@ -1,0 +1,10 @@
+{
+  "name":"SXRON MARKETPLAYS",
+  "short_name":"SXRON",
+  "description":"Единая платформа объявлений и маркетплейса",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#08090d",
+  "theme_color":"#08090d",
+  "icons":[]
+}
