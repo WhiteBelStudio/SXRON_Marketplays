@@ -33,8 +33,8 @@ async function validateCategory(categoryId: string) {
   return { ok: true };
 }
 
-function parseImages(value: unknown) {
-  if (value === undefined) return { ok: true, images: [] as string[] };
+function parseImages(value: unknown): { ok: true; images: string[] } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, images: [] };
   if (!Array.isArray(value)) return { ok: false, error: "Поле фотографий должно быть массивом." };
   if (value.length > 10) return { ok: false, error: "Можно добавить не более 10 фотографий." };
   const images = value.map((item) => String(item ?? "").trim()).filter(Boolean);
