@@ -15,7 +15,7 @@ export default function ListingsPage(){
   const subcategories=useMemo(()=>categories.flatMap(parent=>(parent.children||[]).map(child=>({...child,parentName:parent.name}))),[categories]);
 
   useEffect(()=>{fetch("/api/categories").then(r=>r.json()).then(d=>setCategories(d.categories||[])).catch(()=>{});},[]);
-  async function load(offset=0){
+  async function load(offset=0, append=false){
     setLoading(true); setError("");
     try{
       const params=new URLSearchParams();
@@ -24,10 +24,15 @@ export default function ListingsPage(){
       if(type) params.set("type",type); if(sort!=="recent") params.set("sort",sort); params.set("limit","24"); params.set("offset",String(offset));
       const r=await fetch("/api/listings?"+params.toString(),{cache:"no-store"}); const d=await r.json();
       if(!r.ok) throw new Error(d.error||"Не удалось загрузить объявления.");
-      setListings(d.listings||[]); setTotal(Number(d.total||0)); window.history.replaceState(null,"","/listings?"+params.toString());
+      setListings(prev=>append ? [...prev,...(d.listings||[])] : (d.listings||[])); setTotal(Number(d.total||0)); window.history.replaceState(null,"","/listings?"+params.toString());
     }catch(e){setError(e instanceof Error?e.message:"Не удалось загрузить объявления.");}finally{setLoading(false);}
   }
-  useEffect(()=>{load(0);},[]);
+  useEffect(()=>{
+    const p=new URLSearchParams(window.location.search);
+    setQuery(p.get("q")||""); setCategory(p.get("category")||""); setCity(p.get("city")||""); setCondition(p.get("condition")||"");
+    setMinPrice(p.get("minPrice")||""); setMaxPrice(p.get("maxPrice")||""); setType(p.get("type")||""); setSort(p.get("sort")||"recent");
+    const offset=Number(p.get("offset")||"0"); load(Number.isFinite(offset)&&offset>0?offset:0);
+  },[]);
   function submit(e:FormEvent){e.preventDefault();load(0);}
   function clearFilters(){setQuery("");setCity("");setCategory("");setCondition("");setMinPrice("");setMaxPrice("");setType("");setSort("recent");setTimeout(()=>load(0),0);}
 
@@ -50,7 +55,7 @@ export default function ListingsPage(){
       </form>
       {error?<div className="error">{error}</div>:loading?<p className="muted">Загрузка...</p>:listings.length===0?<div className="emptyState"><h2>Ничего не найдено</h2><p>Измените запрос или ослабьте фильтры.</p><button className="primaryButton" onClick={clearFilters}>Сбросить фильтры</button></div>:
       <><div className="listingGrid">{listings.map(item=><Link className="listingCard" href={"/listings/"+item.id} key={item.id}><div className="listingImage">{item.images?.[0]?.url?<img src={item.images[0].url} alt=""/>:<span>Без фото</span>}</div><div className="listingBody"><h3>{item.title}</h3><strong>{Number(item.price).toLocaleString("ru-RU")} {item.currency}</strong><p>{item.city||"Город не указан"}{item.condition?" · "+item.condition:""}</p></div></Link>)}</div>
-      <div className="catalogFooter">{total>listings.length&&<button className="secondaryButton" onClick={()=>load(listings.length)}>Загрузить ещё</button>}<span className="muted">Показано {listings.length} из {total}</span></div></>}
+      <div className="catalogFooter">{total>listings.length&&<button className="secondaryButton" onClick={()=>load(listings.length,true)}>Загрузить ещё</button>}<span className="muted">Показано {listings.length} из {total}</span></div></>}
     </section>
   </main>;
 }
