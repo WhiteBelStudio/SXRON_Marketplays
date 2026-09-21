@@ -1,0 +1,4 @@
+import { Link } from "expo-router";
+import { StyleSheet,Text,View } from "react-native";
+export default function Home(){return <View style={s.c}><Text style={s.logo}>SXRON</Text><Text style={s.sub}>MARKETPLAYS</Text><Text style={s.t}>Объявления и полноценные магазины в одной платформе.</Text><Link href="/catalog" style={s.b}>Открыть каталог →</Link></View>}
+const s=StyleSheet.create({c:{flex:1,backgroundColor:"#08090d",alignItems:"center",justifyContent:"center",padding:24},logo:{fontSize:44,fontWeight:"900",color:"#20e3b2"},sub:{color:"#fff",fontWeight:"800",letterSpacing:5},t:{color:"#aeb4c2",fontSize:16,textAlign:"center",marginVertical:24,maxWidth:480},b:{backgroundColor:"#7b5cff",color:"#fff",padding:14,borderRadius:12,fontWeight:"800"}});
