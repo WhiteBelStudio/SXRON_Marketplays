@@ -1,0 +1,1 @@
+{"name":"sxron-marketplays-desktop","private":true,"version":"0.1.0","scripts":{"tauri":"tauri","dev":"tauri dev","build":"tauri build"},"devDependencies":{"@tauri-apps/cli":"latest"},"dependencies":{"@tauri-apps/api":"latest"}}
