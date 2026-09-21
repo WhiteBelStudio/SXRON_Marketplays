@@ -1,18 +1,20 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Category = { id: string; name: string; slug: string; parent_id: string | null; children?: Category[] };
 
 export default function SellPage() {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [parentId, setParentId] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [images, setImages] = useState([""]);
+  const [images, setImages] = useState<string[]>([]);
   const [form, setForm] = useState({ title: "", description: "", price: "", currency: "RUB", quantity: "1", city: "", condition: "", type: "product" });
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -22,40 +24,41 @@ export default function SellPage() {
   const selectedParent = categories.find(c => c.id === parentId);
   const leaves = selectedParent?.children || [];
 
-  function update(key: string, value: string) {
-    setForm(prev => ({ ...prev, [key]: value }));
+  function update(key: string, value: string) { setForm(prev => ({ ...prev, [key]: value })); }
+
+  async function uploadFiles(files: FileList | null) {
+    if (!files?.length) return;
+    if (images.length + files.length > 10) { setError("Можно добавить не более 10 фотографий."); return; }
+    setUploading(true); setError("");
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const body = new FormData(); body.append("file", file);
+        const response = await fetch("/api/listings/upload", { method: "POST", body });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Не удалось загрузить фотографию.");
+        uploaded.push(data.url);
+      }
+      setImages(prev => [...prev, ...uploaded]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки фотографии.");
+    } finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
   }
 
   async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
+    event.preventDefault(); setBusy(true); setError("");
     try {
-      const response = await fetch("/api/listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          price: Number(form.price),
-          quantity: Number(form.quantity),
-          category_id: categoryId,
-          images: images.filter(Boolean),
-          status: "published"
-        })
-      });
+      const response = await fetch("/api/listings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, price: Number(form.price), quantity: Number(form.quantity), category_id: categoryId, images, status: "published" }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось разместить объявление.");
       router.push("/listings/" + data.listing.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Произошла ошибка.");
-    } finally {
-      setBusy(false);
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : "Произошла ошибка."); }
+    finally { setBusy(false); }
   }
 
   return (
     <main className="shell">
-      <header className="header"><a className="brand" href="/"><span className="mark">S</span><span>SXRON</span><small>MARKETPLAYS</small></a><a className="ghostButton" href="/listings">Каталог</a></header>
+      <header className="header"><a className="brand" href="/"><span className="mark">S</span><span>SXRON</span><small>MARKETPLAYS</small></a><div className="detailActions"><a className="secondaryButton" href="/my-listings">Мои объявления</a><a className="ghostButton" href="/listings">Каталог</a></div></header>
       <section className="formPage">
         <div className="sectionHead"><div><p className="eyebrow">ПРОДАЖА</p><h1>Разместить товар</h1></div></div>
         <form className="listingForm" onSubmit={submit}>
@@ -70,9 +73,17 @@ export default function SellPage() {
             <label>Состояние<input maxLength={80} value={form.condition} onChange={e => update("condition", e.target.value)} placeholder="Новое, б/у..." /></label>
           </div>
           <label>Тип<select value={form.type} onChange={e => update("type", e.target.value)}><option value="product">Товар</option><option value="classified">Объявление</option></select></label>
-          <div><div className="fieldTitle">Фотографии по URL</div>{images.map((url, index) => <div className="imageInput" key={index}><input type="url" value={url} onChange={e => setImages(prev => prev.map((v, i) => i === index ? e.target.value : v))} placeholder="https://..." />{images.length > 1 && <button type="button" className="iconButton" onClick={() => setImages(prev => prev.filter((_, i) => i !== index))}>×</button>}</div>)}{images.length < 10 && <button type="button" className="secondaryButton" onClick={() => setImages(prev => [...prev, ""])}>+ Добавить фото</button>}</div>
+          <div>
+            <div className="fieldTitle">Фотографии</div>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={e => uploadFiles(e.target.files)} />
+            <button type="button" className="secondaryButton" disabled={uploading || images.length >= 10} onClick={() => fileRef.current?.click()}>{uploading ? "Загрузка..." : "📷 Выбрать фотографии"}</button>
+            <div className="listingGrid" style={{ marginTop: 16 }}>
+              {images.map((url, index) => <div className="listingCard" key={url}><div className="listingImage"><img src={url} alt="" /></div><div className="listingBody"><button type="button" className="dangerButton" onClick={() => setImages(prev => prev.filter((_, i) => i !== index))}>Удалить</button></div></div>)}
+            </div>
+            <p className="muted">До 10 изображений, каждое до 8 МБ.</p>
+          </div>
           {error && <p className="error">{error}</p>}
-          <button className="primaryButton" disabled={busy}>{busy ? "Публикуем..." : "Опубликовать товар"}</button>
+          <button className="primaryButton" disabled={busy || uploading}>{busy ? "Публикуем..." : "Опубликовать товар"}</button>
         </form>
       </section>
     </main>
