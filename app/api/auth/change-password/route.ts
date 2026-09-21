@@ -1,23 +1,16 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { destroyAllUserSessions, createSession } from "@/lib/auth";
+import { getCurrentUser, destroyAllUserSessions, createSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user || user.is_blocked) {
+    return NextResponse.json({ error: "Требуется авторизация." }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const userResult = await db.query(
-      "SELECT id,password_hash,is_blocked FROM users WHERE id=(SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at > now() LIMIT 1) LIMIT 1",
-      [],
-    );
-
-    // The active user is resolved through the shared auth helper below.
-    const { getCurrentUser, hashToken } = await import("@/lib/auth");
-    const user = await getCurrentUser();
-    if (!user || user.is_blocked) {
-      return NextResponse.json({ error: "Требуется авторизация." }, { status: 401 });
-    }
-
     const currentPassword = String(body.currentPassword ?? "");
     const newPassword = String(body.newPassword ?? "");
 
