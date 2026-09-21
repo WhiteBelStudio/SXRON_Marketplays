@@ -95,28 +95,48 @@ export async function GET(request: Request) {
     if (q) { values.push(`%${q}%`); conditions.push(`(l.title ILIKE $${values.length} OR l.description ILIKE $${values.length} OR COALESCE(l.city,'') ILIKE $${values.length} OR COALESCE(c.name,'') ILIKE $${values.length})`); }
     const category = url.searchParams.get("category");
     if (category) { values.push(category); conditions.push(`(c.id=$${values.length} OR c.parent_id=$${values.length})`); }
-    const city = url.searchParams.get("city");
-    if (city) { values.push(city); conditions.push(`l.city ILIKE $${values.length}`); }
+    const city = (url.searchParams.get("city") || "").trim();
+    if (city) { values.push(`%${city}%`); conditions.push(`l.city ILIKE $${values.length}`); }
+    const condition = (url.searchParams.get("condition") || "").trim();
+    if (condition) { values.push(condition); conditions.push(`l.condition=$${values.length}`); }
+    const type = url.searchParams.get("type");
+    if (type === "product" || type === "classified") { values.push(type); conditions.push(`l.type=$${values.length}`); }
     const minPrice = url.searchParams.get("minPrice");
-    if (minPrice && Number.isFinite(Number(minPrice))) { values.push(Number(minPrice)); conditions.push(`l.price >= $${values.length}`); }
+    if (minPrice && Number.isFinite(Number(minPrice)) && Number(minPrice) >= 0) { values.push(Number(minPrice)); conditions.push(`l.price >= $${values.length}`); }
     const maxPrice = url.searchParams.get("maxPrice");
-    if (maxPrice && Number.isFinite(Number(maxPrice))) { values.push(Number(maxPrice)); conditions.push(`l.price <= $${values.length}`); }
+    if (maxPrice && Number.isFinite(Number(maxPrice)) && Number(maxPrice) >= 0) { values.push(Number(maxPrice)); conditions.push(`l.price <= $${values.length}`); }
 
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 24), 1), 50);
-    values.push(limit);
+    const sort = url.searchParams.get("sort");
+    const orderBy = sort === "price_asc"
+      ? "l.price ASC, l.created_at DESC"
+      : sort === "price_desc"
+        ? "l.price DESC, l.created_at DESC"
+        : sort === "oldest"
+          ? "l.created_at ASC"
+          : "l.is_featured DESC, l.created_at DESC";
+
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 24);
+    const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 24, 1), 50);
+    const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+    const offset = Math.max(Number.isFinite(requestedOffset) ? Math.trunc(requestedOffset) : 0, 0);
+    const whereSql = conditions.join(" AND ");
+
+    const countResult = await db.query(
+      `SELECT COUNT(*)::int AS total FROM listings l LEFT JOIN categories c ON c.id=l.category_id LEFT JOIN sellers s ON s.id=l.seller_id WHERE ${whereSql}`,
+      values,
+    );
+
+    const dataValues = [...values, limit, offset];
     const result = await db.query(
       `SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
               c.name AS category,c.slug AS category_slug,s.store_name AS seller,
               COALESCE((SELECT json_agg(json_build_object('id',li.id,'url',li.url,'sort_order',li.sort_order) ORDER BY li.sort_order,li.id) FROM listing_images li WHERE li.listing_id=l.id),'[]'::json) AS images
        FROM listings l LEFT JOIN categories c ON c.id=l.category_id LEFT JOIN sellers s ON s.id=l.seller_id
-       WHERE ${conditions.join(" AND ")} ORDER BY l.is_featured DESC,l.created_at DESC LIMIT $${values.length}`,
-      values,
+       WHERE ${whereSql} ORDER BY ${orderBy} LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,
+      dataValues,
     );
-    return NextResponse.json({ listings: result.rows });
-  } catch {
-    return NextResponse.json({ error: "Не удалось загрузить объявления." }, { status: 500 });
-  }
-}
+    const total = Number(countResult.rows[0]?.total ?? 0);
+    return NextResponse.json({ listings: result.rows, total, limit, offset, hasMore: offset + result.rows.length < total });
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
