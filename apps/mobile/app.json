@@ -1,0 +1,13 @@
+{
+  "expo":{
+    "name":"SXRON MARKETPLAYS",
+    "slug":"sxron-marketplays",
+    "version":"0.1.0",
+    "scheme":"sxronmarketplays",
+    "orientation":"portrait",
+    "userInterfaceStyle":"dark",
+    "platforms":["android","ios","web"],
+    "experiments":{"typedRoutes":true},
+    "plugins":["expo-router"]
+  }
+}
