@@ -14,8 +14,8 @@ async function ownerListing(id: string, userId: string) {
 
 async function validLeafCategory(categoryId: string) {
   const result = await db.query(
-    \`SELECT c.id, EXISTS(SELECT 1 FROM categories child WHERE child.parent_id=c.id AND child.is_active=true) AS has_children
-     FROM categories c WHERE c.id=$1 AND c.is_active=true LIMIT 1\`,
+    `SELECT c.id, EXISTS(SELECT 1 FROM categories child WHERE child.parent_id=c.id AND child.is_active=true) AS has_children
+     FROM categories c WHERE c.id=$1 AND c.is_active=true LIMIT 1`,
     [categoryId],
   );
   const row = result.rows[0];
@@ -34,10 +34,10 @@ export async function GET(request: Request, context: Context) {
   const { id } = await context.params;
   try {
     const publicResult = await db.query(
-      \`SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
+      `SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
               c.name AS category,c.slug AS category_slug,s.store_name AS seller
        FROM listings l LEFT JOIN categories c ON c.id=l.category_id LEFT JOIN sellers s ON s.id=l.seller_id
-       WHERE l.id=$1 AND l.status='published' LIMIT 1\`,
+       WHERE l.id=$1 AND l.status='published' LIMIT 1`,
       [id],
     );
     let listing = publicResult.rows[0] ?? null;
@@ -45,10 +45,10 @@ export async function GET(request: Request, context: Context) {
       const user = await getCurrentUser();
       if (user && !user.is_blocked) {
         const own = await db.query(
-          \`SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
+          `SELECT l.id,l.title,l.slug,l.description,l.price,l.currency,l.quantity,l.city,l.condition,l.type,l.status,l.category_id,l.owner_id,l.seller_id,l.created_at,l.updated_at,
                   c.name AS category,c.slug AS category_slug,s.store_name AS seller
            FROM listings l LEFT JOIN categories c ON c.id=l.category_id LEFT JOIN sellers s ON s.id=l.seller_id
-           WHERE l.id=$1 AND l.owner_id=$2 LIMIT 1\`,
+           WHERE l.id=$1 AND l.owner_id=$2 LIMIT 1`,
           [id, user.id],
         );
         listing = own.rows[0] ?? null;
@@ -94,9 +94,9 @@ export async function PATCH(request: Request, context: Context) {
       : null;
 
     const result = await db.query(
-      \`UPDATE listings SET title=$1,description=$2,price=$3,currency=$4,quantity=$5,city=$6,condition=$7,category_id=$8,status=$9,updated_at=now()
+      `UPDATE listings SET title=$1,description=$2,price=$3,currency=$4,quantity=$5,city=$6,condition=$7,category_id=$8,status=$9,updated_at=now()
        WHERE id=$10 AND owner_id=$11
-       RETURNING id,title,slug,description,price,currency,quantity,city,condition,type,status,category_id,owner_id,seller_id,created_at,updated_at\`,
+       RETURNING id,title,slug,description,price,currency,quantity,city,condition,type,status,category_id,owner_id,seller_id,created_at,updated_at`,
       [title,description,price,currency,quantity,city,condition,categoryId,status,id,user.id],
     );
 
