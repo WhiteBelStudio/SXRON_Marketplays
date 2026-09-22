@@ -1,29 +1,4 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
-
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error:"Не авторизован" },{status:401});
-  const result = await db.query(
-    "SELECT l.* FROM favorites f JOIN listings l ON l.id=f.listing_id WHERE f.user_id=$1 ORDER BY f.created_at DESC",
-    [user.id],
-  );
-  return NextResponse.json({ listings: result.rows });
-}
-
-export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error:"Не авторизован" },{status:401});
-  const { listingId } = await request.json();
-  await db.query("INSERT INTO favorites(user_id,listing_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[user.id,listingId]);
-  return NextResponse.json({ ok:true });
-}
-
-export async function DELETE(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error:"Не авторизован" },{status:401});
-  const { listingId } = await request.json();
-  await db.query("DELETE FROM favorites WHERE user_id=$1 AND listing_id=$2",[user.id,listingId]);
-  return NextResponse.json({ ok:true });
-}
+import {NextResponse} from "next/server";import{getCurrentUser}from "@/lib/auth";import{db}from "@/lib/db";const U=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;function id(b:unknown){const x=(b as any)?.listingId;return typeof x==="string"&&U.test(x)?x:null}
+export async function GET(){const u=await getCurrentUser();if(!u||u.is_blocked)return NextResponse.json({error:"Требуется авторизация."},{status:401});try{const r=await db.query("SELECT l.* FROM favorites f JOIN listings l ON l.id=f.listing_id WHERE f.user_id=$1 AND l.status='published' ORDER BY f.created_at DESC",[u.id]);return NextResponse.json({listings:r.rows})}catch{return NextResponse.json({error:"Не удалось загрузить избранное."},{status:500})}}
+export async function POST(q:Request){const u=await getCurrentUser();if(!u||u.is_blocked)return NextResponse.json({error:"Требуется авторизация."},{status:401});try{const x=id(await q.json());if(!x)return NextResponse.json({error:"Некорректный listingId."},{status:400});const f=await db.query("SELECT id FROM listings WHERE id=$1 AND status='published' LIMIT 1",[x]);if(!f.rows[0])return NextResponse.json({error:"Опубликованное объявление не найдено."},{status:404});await db.query("INSERT INTO favorites(user_id,listing_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[u.id,x]);return NextResponse.json({ok:true})}catch{return NextResponse.json({error:"Не удалось добавить в избранное."},{status:500})}}
+export async function DELETE(q:Request){const u=await getCurrentUser();if(!u||u.is_blocked)return NextResponse.json({error:"Требуется авторизация."},{status:401});try{const x=id(await q.json());if(!x)return NextResponse.json({error:"Некорректный listingId."},{status:400});await db.query("DELETE FROM favorites WHERE user_id=$1 AND listing_id=$2",[u.id,x]);return NextResponse.json({ok:true})}catch{return NextResponse.json({error:"Не удалось удалить из избранного."},{status:500})}}
