@@ -1,2 +1,14 @@
-import{NextResponse}from"next/server";import{getCurrentUser}from"@/lib/auth";import{db}from"@/lib/db";const U=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export async function POST(q:Request){const u=await getCurrentUser();if(!u||u.is_blocked)return NextResponse.json({error:"Требуется авторизация."},{status:401});try{const b=await q.json(),listingId=b.listingId??null,reportedUserId=b.reportedUserId??null,reason=String(b.reason??"").trim();if(listingId===null&&reportedUserId===null)return NextResponse.json({error:"Укажите объявление или пользователя для жалобы."},{status:400});if(reason.length<5||reason.length>1000)return NextResponse.json({error:"Причина жалобы должна содержать от 5 до 1000 символов."},{status:400});if(listingId!==null&&!U.test(String(listingId)))return NextResponse.json({error:"Некорректный listingId."},{status:400});if(reportedUserId!==null&&!U.test(String(reportedUserId)))return NextResponse.json({error:"Некорректный reportedUserId."},{status:400});if(reportedUserId===u.id)return NextResponse.json({error:"Нельзя пожаловаться на самого себя."},{status:400});if(listingId!==null){const r=await db.query("SELECT id FROM listings WHERE id=$1 LIMIT 1",[listingId]);if(!r.rows[0])return NextResponse.json({error:"Объявление не найдено."},{status:404})}if(reportedUserId!==null){const r=await db.query("SELECT id FROM users WHERE id=$1 LIMIT 1",[reportedUserId]);if(!r.rows[0])return NextResponse.json({error:"Пользователь не найден."},{status:404})}const r=await db.query("INSERT INTO reports(reporter_id,listing_id,reported_user_id,reason) VALUES($1,$2,$3,$4) RETURNING id,status,created_at",[u.id,listingId,reportedUserId,reason]);return NextResponse.json({report:r.rows[0]},{status:201})}catch{return NextResponse.json({error:"Не удалось создать жалобу."},{status:500})}}
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({error:"Не авторизован"},{status:401});
+  const body = await request.json();
+  const result = await db.query(
+    "INSERT INTO reports(reporter_id,listing_id,reported_user_id,reason) VALUES($1,$2,$3,$4) RETURNING id,status,created_at",
+    [user.id,body.listingId ?? null,body.reportedUserId ?? null,String(body.reason ?? "").slice(0,1000)],
+  );
+  return NextResponse.json({ report:result.rows[0] },{status:201});
+}
